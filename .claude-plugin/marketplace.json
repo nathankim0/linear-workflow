@@ -1,0 +1,23 @@
+{
+  "name": "linear-workflow",
+  "owner": {
+    "name": "nathankim0",
+    "email": "nathankim0@github.com"
+  },
+  "metadata": {
+    "description": "Linear 이슈 분석 → 워크트리 → 구현 → 5인 검수 → 커밋/PR 자동화 마켓플레이스"
+  },
+  "plugins": [
+    {
+      "name": "linear-workflow",
+      "source": "./",
+      "description": "Linear 이슈 분석 → 워크트리 → 구현 → 5인 검수 → 커밋/PR 자동화",
+      "version": "1.0.0",
+      "author": {
+        "name": "nathankim0"
+      },
+      "keywords": ["linear", "mcp", "workflow", "automation", "review", "worktree"],
+      "strict": false
+    }
+  ]
+}
