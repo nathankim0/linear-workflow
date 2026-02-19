@@ -596,25 +596,66 @@ FAIL이 하나라도 있으면:
 
 **목적**: 검수 통과된 코드를 커밋하고 PR을 생성하여 리뷰 요청
 
-**6-1) 커밋**:
+**6-1) CI 사전 검사 (커밋/PR 전 필수)**:
+
+커밋 전에 CI와 동일한 검사를 로컬에서 먼저 통과시켜야 합니다.
+
+**Step 0. 변경 범위 감지**:
+
+```bash
+git diff --name-only origin/{BASE_BRANCH}...HEAD
+```
+
+변경된 파일 경로를 기준으로 검사 범위를 결정합니다:
+
+| 변경 경로 | 검사 대상 |
+|---|---|
+| `apps/commerce/**` | Web CI |
+| `apps/mobile/**` | Mobile CI |
+| `packages/**`, `package.json`, `pnpm-lock.yaml`, `turbo.json` | Web CI + Mobile CI (둘 다) |
+
+**Step 1. 공통 검사 (항상 실행)**:
+
+```bash
+pnpm format
+pnpm format:check
+```
+
+**Step 2. Web CI 검사 (commerce 또는 packages 변경 시)**:
+
+```bash
+pnpm lint:web
+pnpm build:web
+```
+
+**Step 3. Mobile CI 검사 (mobile 또는 packages 변경 시)**:
+
+```bash
+pnpm lint:mobile
+pnpm --filter @algocare/mobile typecheck
+```
+
+> **CI 검사가 하나라도 실패하면 수정 후 재실행합니다. 모두 통과할 때까지 커밋하지 마세요.**
+
+**6-2) 커밋**:
 
 `/commit` 스킬을 실행합니다.
 
 > Skill 도구로 `commit` 스킬을 호출하세요.
 
-**6-2) PR 생성**:
+**6-3) PR 생성**:
 
 `/pr` 스킬을 실행합니다.
 
 > Skill 도구로 `pr` 스킬을 호출하세요.
 
-**6-3) Linear 이슈 상태 업데이트**:
+**6-4) Linear 이슈 상태 업데이트**:
 
 ```
 mcp__linear__update_issue(id: "{issue_id}", state: "In Review")
 ```
 
-**6-4) 최종 보고**:
+**6-5) 최종 보고**:
 
 ```
 ## Linear Workflow 완료!
@@ -636,7 +677,7 @@ mcp__linear__update_issue(id: "{issue_id}", state: "In Review")
 In Review로 업데이트 완료
 ```
 
-**6-5) 작업 디렉토리 정리**:
+**6-6) 작업 디렉토리 정리**:
 
 AskUserQuestion으로 확인:
 
@@ -838,10 +879,15 @@ PASS 기준: CRITICAL 이슈 0개.
 ### Step 3: 수정 루프
 FAIL이 있으면 수정 후 Step 2 재실행 (최대 3라운드)
 
-### Step 4: 커밋 & PR
-1. 변경사항 커밋 (Conventional Commit, 한글 메시지)
-2. 브랜치 푸시 & PR 생성 (base: {BASE_BRANCH}, 한글 본문)
-3. PR URL 반환
+### Step 4: CI 사전 검사 & 커밋 & PR
+1. 변경 범위에 따라 CI 검사 실행:
+   - 공통: `pnpm format && pnpm format:check`
+   - Web (commerce/packages 변경 시): `pnpm lint:web && pnpm build:web`
+   - Mobile (mobile/packages 변경 시): `pnpm lint:mobile && pnpm --filter @algocare/mobile typecheck`
+2. CI 실패 시 수정 후 재실행 (모두 통과할 때까지)
+3. 변경사항 커밋 (Conventional Commit, 한글 메시지)
+4. 브랜치 푸시 & PR 생성 (base: {BASE_BRANCH}, 한글 본문)
+5. PR URL 반환
 
 ## 결과 형식
 
