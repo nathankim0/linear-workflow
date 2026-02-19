@@ -14,7 +14,7 @@ Linear 이슈를 MCP로 분석(이미지 포함)하고, 워크트리에서 구�
 
 ---
 
-allowed-tools: Bash(git *), Bash(ls *), Bash(cd *), Bash(pnpm *), Bash(npm *), Bash(yarn *), Bash(npx *), Bash(mkdir *), Bash(rm -rf /tmp/linear-workflow-*), Read, Write, Edit, Grep, Glob, Task, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion, EnterPlanMode, ExitPlanMode, Skill, mcp__linear__get_issue, mcp__linear__list_comments, mcp__linear__extract_images, mcp__linear__update_issue, mcp__linear__get_project
+allowed-tools: Bash(git *), Bash(ls *), Bash(cd *), Bash(pnpm *), Bash(npm *), Bash(yarn *), Bash(npx *), Bash(mkdir *), Bash(rm -rf /tmp/linear-workflow-*), Read, Write, Edit, Grep, Glob, Task, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion, Skill, mcp__linear__get_issue, mcp__linear__list_comments, mcp__linear__extract_images, mcp__linear__update_issue, mcp__linear__get_project
 
 ---
 
@@ -23,6 +23,7 @@ allowed-tools: Bash(git *), Bash(ls *), Bash(cd *), Bash(pnpm *), Bash(npm *), B
 **이 워크플로우의 모든 Phase는 반드시 순서대로 실행해야 합니다. 단 하나의 Phase도 건너뛰거나 생략할 수 없습니다.**
 
 절대 하지 말아야 할 것:
+- ❌ **EnterPlanMode 사용 금지** — 절대로 plan mode에 진입하지 마세요. 분석 후 바로 구현하세요
 - ❌ Phase 1(이슈 분석)을 건너뛰고 바로 코딩하는 것 — 반드시 이슈를 먼저 분석하세요
 - ❌ Phase 2(워크트리)를 건너뛰는 것 — 반드시 격리된 환경에서 작업하세요
 - ❌ Phase 4(검수)에서 에이전트를 순차로 소환하는 것 — 반드시 **단일 메시지에서 5개 병렬로** 소환하세요
