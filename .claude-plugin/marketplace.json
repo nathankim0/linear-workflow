@@ -12,7 +12,7 @@
       "name": "linear-workflow",
       "source": "./",
       "description": "Linear 이슈 분석 → 워크트리 → 구현 → 5인 검수 → 커밋/PR 자동화",
-      "version": "1.0.1",
+      "version": "1.1.0",
       "author": {
         "name": "nathankim0"
       },
