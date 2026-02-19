@@ -45,6 +45,22 @@ allowed-tools: Bash(git *), Bash(ls *), Bash(cd *), Bash(pnpm *), Bash(npm *), B
 
 ---
 
+## 모델 배정 규칙
+
+작업 성격에 따라 모델을 구분합니다. Task 도구의 `model` 파라미터를 반드시 지정하세요.
+
+| 작업 | 모델 | 이유 |
+|------|------|------|
+| Phase 3: 구현 | `opus` | 높은 코드 품질과 추론 능력 필요 |
+| Phase 5: 수정 | `opus` | 복잡한 버그 수정에 정확성 필요 |
+| Phase 4: 5인 검수 에이전트 | `sonnet` | 분석/리뷰는 sonnet으로 충분 |
+| Phase 6: 커밋 & PR | `sonnet` | 메시지 생성은 sonnet으로 충분 |
+| 멀티 Phase 3: 이슈별 병렬 에이전트 | `opus` | 구현+수정 포함이므로 opus |
+
+> **요약**: 코드를 쓰거나 고치는 작업 = `opus`, 그 외(분석, 검수, 커밋, PR) = `sonnet`
+
+---
+
 ## 입력 파싱
 
 사용자가 제공한 인자: `$ARGUMENTS`
@@ -316,6 +332,7 @@ Task 도구로 5개 서브에이전트를 **반드시 하나의 메시지에서 
 #### Agent 1: 린트 & 타입 검사
 
 - **subagent_type**: `Bash`
+- **model**: `sonnet`
 - **description**: "린트 & 타입 검수"
 - **프롬프트**:
 
@@ -357,6 +374,7 @@ Task 도구로 5개 서브에이전트를 **반드시 하나의 메시지에서 
 #### Agent 2: 코드 품질 리뷰
 
 - **subagent_type**: `general-purpose`
+- **model**: `sonnet`
 - **description**: "코드 품질 검수"
 - **프롬프트**:
 
@@ -400,6 +418,7 @@ WARNING은 보고하되 PASS에 영향 없음
 #### Agent 3: 로직 & 버그 리뷰
 
 - **subagent_type**: `general-purpose`
+- **model**: `sonnet`
 - **description**: "로직 & 버그 검수"
 - **프롬프트**:
 
@@ -442,6 +461,7 @@ PASS 기준: CRITICAL 이슈가 0개
 #### Agent 4: 성능 리뷰
 
 - **subagent_type**: `general-purpose`
+- **model**: `sonnet`
 - **description**: "성능 검수"
 - **프롬프트**:
 
@@ -483,6 +503,7 @@ PASS 기준: CRITICAL 이슈가 0개
 #### Agent 5: 보안 리뷰
 
 - **subagent_type**: `general-purpose`
+- **model**: `sonnet`
 - **description**: "보안 검수"
 - **프롬프트**:
 
@@ -762,8 +783,9 @@ git worktree add {PATH} -b {BRANCH} origin/{BASE_BRANCH}
 
 ### 멀티 Phase 3: 이슈별 서브에이전트 병렬 소환
 
-각 이슈를 독립된 `general-purpose` 서브에이전트에게 할당합니다.
+각 이슈를 독립된 `general-purpose` 서브에이전트(**model: `opus`**)에게 할당합니다.
 각 에이전트는 해당 워크트리에서 **단일 모드의 Phase 3~6을 독립적으로** 수행합니다.
+단, 내부 5인 검수 서브에이전트는 **model: `sonnet`**을 사용합니다.
 
 **3-1) TaskCreate로 진행 추적**:
 
@@ -801,13 +823,14 @@ Task 도구로 N개의 서브에이전트를 **반드시 하나의 메시지에�
 3. 린트 & 타입체크 통과 확인
 
 ### Step 2: 5인 검수
-Task 도구로 5개 서브에이전트를 **하나의 메시지에서 병렬로** 소환하여 검수:
+Task 도구로 5개 서브에이전트를 **하나의 메시지에서 병렬로** 소환하여 검수.
+**모든 검수 에이전트는 model: `sonnet`을 사용하세요.**
 
-1. **린트 & 타입** (Bash): 린트, 타입체크, 포맷 검사 실행
-2. **코드 품질** (general-purpose): 중복, 네이밍, 매직넘버, any 타입 검수
-3. **로직 & 버그** (general-purpose): 비즈니스 로직, 엣지 케이스, null 안전성 검수
-4. **성능** (general-purpose): 리렌더, 메모이제이션, 번들 사이즈 검수
-5. **보안** (general-purpose): XSS, 하드코딩 시크릿, 입력 검증 검수
+1. **린트 & 타입** (Bash, sonnet): 린트, 타입체크, 포맷 검사 실행
+2. **코드 품질** (general-purpose, sonnet): 중복, 네이밍, 매직넘버, any 타입 검수
+3. **로직 & 버그** (general-purpose, sonnet): 비즈니스 로직, 엣지 케이스, null 안전성 검수
+4. **성능** (general-purpose, sonnet): 리렌더, 메모이제이션, 번들 사이즈 검수
+5. **보안** (general-purpose, sonnet): XSS, 하드코딩 시크릿, 입력 검증 검수
 
 각 에이전트에게 워크트리 경로와 변경된 파일 목록을 전달하세요.
 PASS 기준: CRITICAL 이슈 0개.
