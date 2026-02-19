@@ -1,6 +1,6 @@
 # Linear Workflow
 
-allowed-tools: Bash(git *), Bash(ls *), Bash(cd *), Bash(pnpm *), Bash(npm *), Bash(yarn *), Bash(npx *), Bash(mkdir *), Bash(rm -rf /tmp/linear-workflow-*), Read, Write, Edit, Grep, Glob, Task, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion, Skill, mcp__linear__get_issue, mcp__linear__list_comments, mcp__linear__extract_images, mcp__linear__update_issue, mcp__linear__get_project
+allowed-tools: Bash(git *), Bash(ls *), Bash(cd *), Bash(pnpm *), Bash(npm *), Bash(yarn *), Bash(npx *), Bash(mkdir *), Bash(rm -rf /tmp/linear-workflow-*), Read, Write, Edit, Grep, Glob, Task, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion, Skill, mcp__linear__get_issue, mcp__linear__list_comments, mcp__linear__extract_images, mcp__linear__get_project
 
 ---
 
@@ -14,17 +14,19 @@ Phase 2: git worktree 생성 & cd 이동  ← 반드시 실행! 현재 디렉토
 Phase 3: 워크트리 안에서 코드 구현
 Phase 4: Task 도구로 5개 검수 에이전트 병렬 소환
 Phase 5: FAIL 수정 → Phase 4 재실행 (최대 3회)
-Phase 6: CI 검사 → /commit → /pr → Linear 상태 업데이트
+Phase 6: CI 검사 → /commit → /pr
 ```
 
 ### 금지 사항
 
+- ❌ **Linear 이슈 상태 변경 절대 금지** — `mcp__linear__update_issue` 호출하지 마라. 상태는 사용자가 직접 관리한다
+- ❌ **현재 브랜치(stage/main)에 직접 커밋 절대 금지** — 반드시 워크트리의 이슈 브랜치에서만 작업하라
 - ❌ **EnterPlanMode 절대 금지** — plan mode 진입하지 마라
 - ❌ **Phase 2 생략 금지** — 반드시 `git worktree add` 실행하고 `cd`로 이동한 후 작업하라
-- ❌ **현재 브랜치에서 직접 작업 금지** — 반드시 새 워크트리에서 작업하라
 - ❌ **Phase 4 순차 실행 금지** — 5개 에이전트를 반드시 **하나의 메시지에서 병렬로** Task 호출하라
 - ❌ **수동 커밋 금지** — 반드시 `/commit` 스킬과 `/pr` 스킬을 Skill 도구로 호출하라
 - ❌ **검수 없이 커밋 금지** — Phase 4 검수를 반드시 통과해야 한다
+- ❌ **PR 없이 종료 금지** — 반드시 각 이슈별로 `/pr`까지 완료해야 한다
 
 ### Phase 게이트 검증
 
@@ -280,11 +282,7 @@ Skill 도구로 `commit` 호출.
 
 Skill 도구로 `pr` 호출.
 
-**6-4) Linear 상태 업데이트:**
-
-`mcp__linear__update_issue(id: "{issue_id}", state: "In Review")`
-
-**6-5) 최종 보고:**
+**6-4) 최종 보고:**
 
 ```
 ## Linear Workflow 완료!
@@ -295,7 +293,6 @@ Skill 도구로 `pr` 호출.
 | 워크트리 | {WORKTREE_PATH} |
 | 검수 라운드 | {N} |
 | PR | {URL} |
-| Linear | In Review |
 ```
 
 ---
@@ -354,8 +351,7 @@ pnpm format && format:check, lint:web/build:web 또는 lint:mobile/typecheck
 
 ### 멀티 Phase 4: 통합 보고
 
-성공한 이슈 → `mcp__linear__update_issue` In Review
-결과 테이블 출력.
+결과 테이블 출력. (Linear 이슈 상태는 변경하지 않는다)
 
 ---
 
