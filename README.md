@@ -40,16 +40,19 @@
 ### `linear-workflow` — Linear 이슈 완전 자동화
 
 ```
-/linear-workflow:linear-workflow <이슈-식별자>
+/linear-workflow:linear-workflow <이슈-식별자> [이슈2] [이슈3] ...
 ```
 
 **예시**:
 ```
+# 단일 이슈
 /linear-workflow:linear-workflow B2C-4143
-/linear-workflow:linear-workflow ENG-256
+
+# 멀티 이슈 — 각 이슈가 독립 워크트리에서 병렬 처리
+/linear-workflow:linear-workflow B2C-4137 B2C-4136 B2C-4133 B2C-4143 B2C-4129
 ```
 
-### 6단계 파이프라인
+### 단일 모드 — 6단계 파이프라인
 
 | Phase | 이름 | 설명 |
 |-------|------|------|
@@ -69,6 +72,17 @@
 | 3 | 로직 & 버그 | general-purpose | 비즈니스 로직, 엣지 케이스, null 안전성 |
 | 4 | 성능 | general-purpose | 리렌더, 메모이제이션, 번들 사이즈 |
 | 5 | 보안 | general-purpose | XSS, 하드코딩 시크릿, 입력 검증 |
+
+### 멀티 모드 — 병렬 파이프라인
+
+이슈 2개 이상 입력 시 자동 전환:
+
+| Phase | 이름 | 설명 |
+|-------|------|------|
+| 1 | **전체 분석** | 모든 이슈를 MCP로 병렬 분석 |
+| 2 | **전체 워크트리** | 이슈별 워크트리 병렬 생성 |
+| 3 | **병렬 구현** | 이슈별 서브에이전트가 구현 → 5인 검수 → 커밋 → PR 독립 수행 |
+| 4 | **통합 보고** | 전체 결과 집계 & Linear 상태 일괄 업데이트 |
 
 ### 차별점: 수동 작업 vs Linear Workflow
 
@@ -132,8 +146,10 @@
 
 ## 전체 흐름
 
+### 단일 모드
+
 ```
-$ARGUMENTS (이슈 ID)
+이슈 ID 1개
     │
     ▼
 [Phase 1] Linear MCP 이슈 분석 (이미지 포함)
@@ -156,6 +172,29 @@ $ARGUMENTS (이슈 ID)
          │
          ▼
 [Phase 6] /commit → /pr → Linear 상태 업데이트
+```
+
+### 멀티 모드
+
+```
+이슈 ID 여러 개
+    │
+    ▼
+[멀티 Phase 1] 전체 이슈 MCP 병렬 분석
+    │
+    ▼ (사용자 승인)
+[멀티 Phase 2] 전체 워크트리 병렬 생성
+    │
+    ▼
+[멀티 Phase 3] 이슈별 서브에이전트 병렬 소환
+    │
+    ├── Agent-1: B2C-4137 (구현 → 5인 검수 → 커밋 → PR)
+    ├── Agent-2: B2C-4136 (구현 → 5인 검수 → 커밋 → PR)
+    ├── Agent-3: B2C-4133 (구현 → 5인 검수 → 커밋 → PR)
+    └── ...
+    │
+    ▼
+[멀티 Phase 4] 결과 통합 & Linear 상태 일괄 업데이트
 ```
 
 ---

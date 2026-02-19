@@ -5,12 +5,12 @@ Linear 이슈를 MCP로 분석(이미지 포함)하고, 워크트리에서 구�
 ## 사용법
 
 ```
-/linear-workflow:linear-workflow <이슈-식별자>
+/linear-workflow:linear-workflow <이슈-식별자> [이슈-식별자2] [이슈-식별자3] ...
 ```
 
 **예시**:
-- `/linear-workflow:linear-workflow B2C-4143`
-- `/linear-workflow:linear-workflow B2C-4107`
+- `/linear-workflow:linear-workflow B2C-4143` — 단일 이슈
+- `/linear-workflow:linear-workflow B2C-4137 B2C-4136 B2C-4133 B2C-4143 B2C-4129` — 멀티 이슈 병렬 처리
 
 ---
 
@@ -41,6 +41,7 @@ allowed-tools: Bash(git *), Bash(ls *), Bash(cd *), Bash(pnpm *), Bash(npm *), B
 | `MAX_REVIEW_ROUNDS` | 3 | 최대 검수 반복 횟수 |
 | `REVIEW_AGENT_COUNT` | 5 | 검수 서브에이전트 수 |
 | `PLAN_FILE` | `workflow-plan.md` | 워크플로우 진행 상황 기록 파일 |
+| `MAX_PARALLEL_ISSUES` | 5 | 동시 병렬 처리 최대 이슈 수 |
 
 ---
 
@@ -50,11 +51,39 @@ allowed-tools: Bash(git *), Bash(ls *), Bash(cd *), Bash(pnpm *), Bash(npm *), B
 
 **파싱 규칙**:
 1. `$ARGUMENTS`에서 Linear 이슈 식별자를 추출 (예: `B2C-4143`, `ENG-123`)
-2. 식별자가 없으면 AskUserQuestion으로 물어보기
+2. 여러 식별자가 있으면 모두 추출 (공백, 쉼표, 줄바꿈으로 구분)
+3. 식별자가 없으면 AskUserQuestion으로 물어보기
+4. 이슈가 1개 → **단일 모드**, 2개 이상 → **멀티 모드**
 
 ---
 
-## 워크플로우
+## 모드 분기
+
+### 단일 모드 (이슈 1개)
+
+아래 "워크플로우" 섹션의 Phase 1~6을 순서대로 실행합니다.
+
+### 멀티 모드 (이슈 2개 이상)
+
+**멀티 모드 전체 흐름**:
+```
+[멀티 Phase 1] 전체 이슈 병렬 분석 (MCP)
+    │
+    ▼ (사용자 승인)
+[멀티 Phase 2] 전체 워크트리 병렬 생성
+    │
+    ▼
+[멀티 Phase 3] 이슈별 서브에이전트 병렬 소환
+    │         (각 에이전트가 Phase 3~6을 독립 수행)
+    ▼
+[멀티 Phase 4] 전체 결과 통합 보고
+```
+
+상세 절차는 "멀티 모드 워크플로우" 섹션을 참고하세요.
+
+---
+
+## 워크플로우 (단일 모드)
 
 아래 단계를 **반드시 순서대로, 빠짐없이** 수행하세요. **모든 출력은 한글로** 작성합니다.
 
@@ -640,3 +669,234 @@ $ARGUMENTS (이슈 ID)
 1. `$WORK_DIR/workflow-plan.md`에 에러 상태를 기록
 2. 사용자에게 에러 내용을 보고하고, 재시도 여부를 AskUserQuestion으로 확인
 3. 재시도 시 마지막 성공 Phase부터 재개
+
+---
+---
+
+## 멀티 모드 워크플로우
+
+이슈가 2개 이상일 때 자동으로 이 모드로 전환됩니다.
+각 이슈가 독립된 워크트리에서 병렬로 처리됩니다.
+
+### 멀티 Phase 1: 전체 이슈 병렬 분석
+
+**1-1) 작업 디렉토리 생성**:
+
+```bash
+WORK_DIR="/tmp/linear-workflow-$(date +%s)"
+mkdir -p $WORK_DIR
+```
+
+**1-2) 전체 이슈 MCP 병렬 호출**:
+
+모든 이슈의 `mcp__linear__get_issue`를 **하나의 메시지에서 병렬로** 호출합니다.
+
+각 이슈에 대해:
+- `mcp__linear__get_issue(id: "{이슈ID}", includeRelations: true)`
+
+**1-3) 이미지 추출**:
+
+description에 이미지가 있는 이슈들은 `mcp__linear__extract_images`로 이미지를 추출합니다.
+
+**1-4) 분석 결과 통합 출력**:
+
+```
+## 멀티 이슈 분석 결과 ({N}개)
+
+| # | 이슈 | 제목 | 우선순위 | 브랜치 |
+|---|------|------|---------|--------|
+| 1 | B2C-4137 | 오메가3 제외 제안 실패함 | Medium | b2c-4137 |
+| 2 | B2C-4136 | 증상기반 요청 미표시 | Medium | b2c-4136 |
+| ... | ... | ... | ... | ... |
+
+### 이슈별 요약
+
+#### 1. B2C-4137
+{요구사항 요약}
+
+#### 2. B2C-4136
+{요구사항 요약}
+
+...
+```
+
+**→ 사용자 승인을 받은 후 다음 단계로 진행합니다.**
+
+---
+
+### 멀티 Phase 2: 전체 워크트리 병렬 생성
+
+**2-1) 환경 확인**:
+
+```bash
+GIT_ROOT=$(git rev-parse --show-toplevel)
+git branch -r | grep -q 'origin/stage' && echo "BASE=stage" || echo "BASE=main"
+git worktree list
+```
+
+**2-2) 전체 워크트리 생성**:
+
+각 이슈의 `gitBranchName`을 사용하여 워크트리를 생성합니다.
+이미 존재하는 워크트리/브랜치는 재사용합니다.
+
+```bash
+git fetch origin
+
+# 각 이슈별로:
+git worktree add {PATH} -b {BRANCH} origin/{BASE_BRANCH}
+```
+
+**2-3) 생성 결과 출력**:
+
+```
+## 워크트리 생성 완료
+
+| # | 이슈 | 브랜치 | 경로 | 상태 |
+|---|------|--------|------|------|
+| 1 | B2C-4137 | b2c-4137 | /path/to/worktree-1 | 새로 생성 |
+| 2 | B2C-4136 | b2c-4136 | /path/to/worktree-2 | 기존 재사용 |
+| ... | ... | ... | ... | ... |
+```
+
+---
+
+### 멀티 Phase 3: 이슈별 서브에이전트 병렬 소환
+
+각 이슈를 독립된 `general-purpose` 서브에이전트에게 할당합니다.
+각 에이전트는 해당 워크트리에서 **단일 모드의 Phase 3~6을 독립적으로** 수행합니다.
+
+**3-1) TaskCreate로 진행 추적**:
+
+각 이슈의 작업을 TaskCreate로 등록합니다.
+
+**3-2) 서브에이전트 병렬 소환**:
+
+Task 도구로 N개의 서브에이전트를 **반드시 하나의 메시지에서 병렬로** 호출합니다.
+
+각 에이전트 프롬프트:
+
+```
+당신은 Linear Workflow의 병렬 작업자입니다.
+아래 이슈를 독립적으로 구현하고, 검수하고, 커밋/PR까지 완료하세요.
+
+## 이슈 정보
+- 식별자: {identifier}
+- 제목: {title}
+- 설명: {description}
+- 이미지: {이미지 분석 결과}
+- 코멘트: {코멘트 내용}
+- 부모 이슈: {부모 이슈 정보}
+
+## 작업 환경
+- 워크트리 경로: {WORKTREE_PATH}
+- 브랜치: {BRANCH_NAME}
+- 기본 브랜치: {BASE_BRANCH}
+- 작업 기록: {WORK_DIR}/issue-{identifier}.md
+
+## 수행할 작업
+
+### Step 1: 구현
+1. 워크트리의 CLAUDE.md, .cursor/rules/ 규칙 파일을 읽어 프로젝트 규칙 파악
+2. 이슈 요구사항에 따라 코드 구현
+3. 린트 & 타입체크 통과 확인
+
+### Step 2: 5인 검수
+Task 도구로 5개 서브에이전트를 **하나의 메시지에서 병렬로** 소환하여 검수:
+
+1. **린트 & 타입** (Bash): 린트, 타입체크, 포맷 검사 실행
+2. **코드 품질** (general-purpose): 중복, 네이밍, 매직넘버, any 타입 검수
+3. **로직 & 버그** (general-purpose): 비즈니스 로직, 엣지 케이스, null 안전성 검수
+4. **성능** (general-purpose): 리렌더, 메모이제이션, 번들 사이즈 검수
+5. **보안** (general-purpose): XSS, 하드코딩 시크릿, 입력 검증 검수
+
+각 에이전트에게 워크트리 경로와 변경된 파일 목록을 전달하세요.
+PASS 기준: CRITICAL 이슈 0개.
+
+### Step 3: 수정 루프
+FAIL이 있으면 수정 후 Step 2 재실행 (최대 3라운드)
+
+### Step 4: 커밋 & PR
+1. 변경사항 커밋 (Conventional Commit, 한글 메시지)
+2. 브랜치 푸시 & PR 생성 (base: {BASE_BRANCH}, 한글 본문)
+3. PR URL 반환
+
+## 결과 형식
+
+```json
+{
+  "issue": "{identifier}",
+  "status": "success | partial | failed",
+  "summary": "작업 요약",
+  "review_rounds": N,
+  "pr_url": "https://...",
+  "remaining_issues": []
+}
+```
+```
+
+**3-3) 결과 수집**:
+
+모든 에이전트의 결과를 수집합니다.
+
+---
+
+### 멀티 Phase 4: 전체 결과 통합 보고
+
+**4-1) Linear 이슈 상태 일괄 업데이트**:
+
+성공한 이슈들의 상태를 "In Review"로 업데이트합니다:
+
+```
+mcp__linear__update_issue(id: "{issue_id}", state: "In Review")
+```
+
+**4-2) 최종 통합 보고**:
+
+```
+## Linear Workflow 완료! ({성공}/{전체} 이슈)
+
+### 결과 요약
+
+| # | 이슈 | 상태 | 검수 라운드 | PR |
+|---|------|------|-----------|-----|
+| 1 | B2C-4137 | ✅ 성공 | 1 | #123 |
+| 2 | B2C-4136 | ✅ 성공 | 2 | #124 |
+| 3 | B2C-4133 | ❌ 실패 | 3 | - |
+| ... | ... | ... | ... | ... |
+
+### 실패한 이슈 (있는 경우)
+{실패 원인 상세}
+
+### Linear 상태
+성공한 이슈들: In Review로 업데이트 완료
+```
+
+**4-3) 작업 디렉토리 정리**:
+
+AskUserQuestion으로 확인 후 정리.
+
+---
+
+## 멀티 모드 전체 흐름
+
+```
+$ARGUMENTS (이슈 ID 여러 개)
+    │
+    ▼
+[멀티 Phase 1] 전체 이슈 MCP 병렬 분석
+    │
+    ▼ (사용자 승인)
+[멀티 Phase 2] 전체 워크트리 병렬 생성
+    │
+    ▼
+[멀티 Phase 3] 이슈별 서브에이전트 병렬 소환
+    │
+    ├── Agent-1: B2C-4137 (구현 → 검수 → 커밋 → PR)
+    ├── Agent-2: B2C-4136 (구현 → 검수 → 커밋 → PR)
+    ├── Agent-3: B2C-4133 (구현 → 검수 → 커밋 → PR)
+    ├── Agent-4: B2C-4143 (구현 → 검수 → 커밋 → PR)
+    └── Agent-5: B2C-4129 (구현 → 검수 → 커밋 → PR)
+    │
+    ▼
+[멀티 Phase 4] 결과 통합 & Linear 상태 업데이트
+```
